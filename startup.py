@@ -45,23 +45,34 @@ class ChatRoom:
         self.win_history.scrollok(True)
         self.win_history.idlok(True)
 
+    def get_str_width(self, text):
+        """简单估算字符串在屏幕上的显示宽度 (中文=2, 英文=1)"""
+        width = 0
+        for char in text:
+            if ord(char) > 127:
+                width += 2
+            else:
+                width += 1
+        return width
+
     def get_nickname(self):
         """启动时询问用户昵称"""
         self.stdscr.clear()
         prompt = "请输入你的昵称 (支持中文): "
         
-        # 计算居中显示
-        start_x = max(0, (self.cols - len(prompt)*2) // 2)
+        # 1. 正确计算居中位置
+        prompt_width = self.get_str_width(prompt)
+        start_x = max(0, (self.cols - prompt_width) // 2)
         start_y = self.rows // 2
         
+        # 2. 打印提示语
         self.stdscr.addstr(start_y, start_x, prompt)
         self.stdscr.refresh()
         
         curses.echo() # 开启回显
         try:
-            # 这里的输入比较简单，主要为了获取名字
-            # 如果在某些终端下输入中文有问题，可以考虑默认名
-            nick_bytes = self.stdscr.getstr(start_y, start_x + len(prompt), 15)
+            # 昵称最长输入 60 字节,大约等于 20 个汉字
+            nick_bytes = self.stdscr.getstr(60) 
             self.nickname = nick_bytes.decode('utf-8').strip()
             
             if not self.nickname:
@@ -143,14 +154,15 @@ class ChatRoom:
             self.win_input.box() # 画边框
             self.win_input.addstr(1, 1, "Say: ")
             
-            # 处理长文本显示，只显示最后能装下的部分
-            max_len = self.cols - 8
+            # 显示处理
             display_text = input_buffer
+            display_width = self.get_str_width(display_text)
+            max_width = self.cols - 8
             
-            # 简单的宽度计算 (注意：这里把中文当1个长度算，虽然不完美但不会崩溃)
-            # 如果需要完美支持宽字符切片，需要 wcwidth 库，但这里保持标准库依赖
-            if len(display_text) > max_len:
-                display_text = display_text[-max_len:]
+            # 如果太长，简单倒着切片
+            if display_width > max_width:
+                 # 这里的切片只是粗略估算，防止报错
+                display_text = display_text[-(max_width//2):] 
                 
             try:
                 self.win_input.addstr(1, 6, display_text)
